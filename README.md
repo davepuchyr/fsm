@@ -99,7 +99,7 @@ Next, send the events to the state machine.
 
 This will print the following to the console:
 
-    "Hello World 1"
-    "Hello World 2"
+    "MSG 1"
+    "MSG 2"
     "Ignoring MSG as the state machine is closed"
  
