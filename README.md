@@ -48,7 +48,7 @@ must be carefully tracked to avoid leaking resources.
                         |           |           v          |
                         +-----------+------> ABORTING -----+
 
-For more information on UML state machines, see [http://en.wikipedia.org/wiki/UML_state_machine].
+For more information on UML state machines, see http://en.wikipedia.org/wiki/UML_state_machine.
 
 ## Usage
 
