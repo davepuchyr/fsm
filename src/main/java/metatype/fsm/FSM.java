@@ -1,4 +1,5 @@
 package metatype.fsm;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -12,7 +13,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Defines and manages a finite state machine.
+ * Defines and manages a finite state machine.  Follows the UML definition for
+ * state machines regarding states, transitions, events, and guard conditions.
+ * Events allow the state machine to respond to external stimuli and may cause
+ * handler invocations or state transitions.  Each event is handled discretely
+ * and can result in multiple state transitions.  If a new event arrives while
+ * the state machine is busy, it is queued and the currently processing thread
+ * will deliver the queued events in order.
+ * <p>
+ * 
+ * @see FsmEvent
+ * @see FsmState
+ * @see Transition
+ * 
+ * @see http://en.wikipedia.org/wiki/UML_state_machine
  * 
  * @author metatype
  *
@@ -30,7 +44,8 @@ public class FSM<E extends Enum<E>> {
   }
   
   /**
-   * Defines a guard condition applied to a state transition.
+   * Defines a guard condition applied to a state transition.  The guard will
+   * allow or prevent a transition from occurring.
    *
    * @param <E> the event type
    */
@@ -44,7 +59,9 @@ public class FSM<E extends Enum<E>> {
   }
 
   /**
-   * Defines an event to be delivered to a state machine.
+   * Defines an event to be delivered to a state machine.  Implementors may
+   * define custom fields to be consumed during event handling.
+   * 
    * @param <E> the event type
    */
   public interface FsmEvent<E extends Enum<E>> {
@@ -56,7 +73,7 @@ public class FSM<E extends Enum<E>> {
   }
   
   /**
-   * Provides a default event implementation.
+   * Provides a default event implementation that wraps an enum type.
    *
    * @param <E> the event type
    */
@@ -79,6 +96,29 @@ public class FSM<E extends Enum<E>> {
     }
   }
   
+  /**
+   * Defines a transition between two states.  The transition may be triggered
+   * by during event delivery if the following conditions are met:
+   * <ul>
+   *  <li>the event type matches the transition trigger or the trigger is not specified
+   *  <li>the guard condition passes or is not specified
+   * </ul>
+   * 
+   * When a transition is triggered the following callbacks are invoked in order
+   * (if specified):
+   * <ol>
+   *  <li>the exit callback on the source state
+   *  <li>the transition event handler
+   *  <li>the entry callback on the destination state
+   * <ol>
+   *
+   * After the destination state entry is complete, it will be checked to see if
+   * any further transitions should be performed.  Using this approach a single
+   * event can cause the state machine to "fall through" several linked states
+   * from a single event delivery.  
+   * 
+   * @param <E> the event type
+   */
   public static class Transition<E extends Enum<E>> {
     /** the source state */
     private final FsmState<E> from;
@@ -112,6 +152,27 @@ public class FSM<E extends Enum<E>> {
     }
   }
   
+  /**
+   * Defines a logical state.  The state is configured with handlers that respond
+   * to external stimuli (events).  The events are delivered in order, one at a time
+   * to ensure proper synchronization of external state.  The following callbacks
+   * may be configured:
+   * <ul>
+   *  <li>entry
+   *  <li>exit
+   *  <li>event -> handler
+   *  <li>default
+   * </ul>
+   * 
+   * The entry and exit callbacks are invoked during state transitions.  The
+   * internal event handlers are invoked when the incoming event type matches
+   * the handler mapping.  If no handlers are configured for a particular type,
+   * the event is delivered to the default handler.
+   * 
+   * The internal handlers are invoked prior to performing state transitions.
+   *
+   * @param <E> the event type
+   */
   public static class FsmState<E extends Enum<E>> {
     /** the state name */
     private final String name;
@@ -212,7 +273,7 @@ public class FSM<E extends Enum<E>> {
 
     /**
      * Returns the event handlers.  The appropriate handler is invoked by matching
-     * the trigger type when an event is delivered to a state.
+     * the event type when an event is delivered to a state.
      * 
      * @see FsmEvent#getType()
      * @return the handlers
