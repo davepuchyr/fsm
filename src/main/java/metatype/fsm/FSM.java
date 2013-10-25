@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
  * @see FsmEvent
  * @see FsmState
  * @see Transition
+ * @see FsmSubstateMachine
  * 
  * @see http://en.wikipedia.org/wiki/UML_state_machine
  * 
@@ -297,32 +298,45 @@ public class FSM<E extends Enum<E>> {
       return name;
     }
     
-    private FsmState<E> handleEvent(FsmEvent<E> evt) {
+    protected FsmState<E> handleEvent(FsmEvent<E> evt) {
+      fireInternalHandler(evt);
+      return transition(this, evt);
+    }
+    
+    protected void fireInternalHandler(FsmEvent<E> evt) {
       EventHandler<E> eh = handlers.containsKey(evt.getType()) ?
           handlers.get(evt.getType()) : defHandler;
       if (eh != null) {
         eh.handleEvent(evt);
       }
-      
-      return transition(this, evt);
     }
 
-    private FsmState<E> transition(FsmState<E> state, FsmEvent<E> evt) {
+    protected void fireEntry() {
+      LOG.trace("Entering state {}", this);
+      if (entry != null) {
+        entry.run();
+      }
+
+    }
+    
+    protected void fireExit() {
+      if (exit != null) {
+        exit.run();
+      }
+      LOG.trace("Exited state {}", this);
+    }
+    
+    protected FsmState<E> transition(FsmState<E> state, FsmEvent<E> evt) {
       for (Transition<E> t : state.transitions) {
         if (t.trigger == null || t.trigger == evt.getType()) {
           if (t.guard == null || t.guard.accept(evt)) {
             LOG.trace("Invoking transition {}", t);
-            if (state.exit != null) {
-              state.exit.run();
-            }
 
+            state.fireExit();
             if (t.handler != null) {
               t.handler.handleEvent(evt);
             }
-            
-            if (t.to.entry != null) {
-              t.to.entry.run();
-            }
+            t.to.fireEntry();
 
             return transition(t.to, evt);
           }
@@ -332,6 +346,78 @@ public class FSM<E extends Enum<E>> {
     }
   }
 
+  /**
+   * Defines a state that encapsulates a nested state machine.  This hierarchical
+   * approach allows for factoring behavior common to all the substates into the
+   * parent state.  The current substate will be reset each time the parent is
+   * entered or exited.  
+   * <p>
+   * Events processing is performed in the following order:
+   * <ol>
+   *  <li> entry - parent
+   *  <li> entry - starting substate
+   *  <li> internal event handler - parent
+   *  <li> internal event handler - child
+   *  <li> transition - child
+   *  <li> transition - parent
+   *  <li> exit - child
+   *  <li> exit - parent
+   * </ol>
+   *
+   * @param <E> the event type
+   */
+  public static class FsmSubstateMachine<E extends Enum<E>> extends FsmState<E> {
+    /** the starting state */
+    private final FsmState<E> start;
+    
+    /** the current substate */
+    private FsmState<E> current;
+    
+    public FsmSubstateMachine(String name, Class<E> types, FsmState<E> start) {
+      this(name, types, start, null, null, null);
+    }
+    
+    public FsmSubstateMachine(String name, Class<E> types, final FsmState<E> start, Runnable entry, Runnable exit, EventHandler<E> defHandler) {
+      super(name, types, entry, exit, defHandler);
+      this.start = start;
+    }
+
+    /**
+     * Returns the currently active substate.
+     * @return the current state, or null
+     */
+    public FsmState<E> getCurrent() {
+      return current;
+    }
+    
+    @Override
+    protected FsmState<E> handleEvent(FsmEvent<E> evt) {
+      super.fireInternalHandler(evt);
+
+      assert current != null;
+      LOG.trace("Delivering event {} to state {}", evt, current);
+      current = current.handleEvent(evt);
+      
+      return super.transition(this, evt);
+    }
+
+    @Override 
+    protected void fireEntry() {
+      super.fireEntry();
+      
+      current = start;
+      current.fireEntry();
+    }
+    
+    @Override 
+    protected void fireExit() {
+      current.fireExit();
+      current = null;
+      
+      super.fireExit();
+    }
+  }
+  
   /**
    * Composes two guard conditions using short-circuit logical AND.
    * 
@@ -414,10 +500,8 @@ public class FSM<E extends Enum<E>> {
     this.events = queue;
     running = new AtomicBoolean(false);
     current = start;
-    
-    if (current.entry != null) {
-      current.entry.run();
-    }
+
+    current.fireEntry();
   }
   
   /**

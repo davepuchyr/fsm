@@ -48,6 +48,10 @@ must be carefully tracked to avoid leaking resources.
                         |           |           v          |
                         +-----------+------> ABORTING -----+
 
+In addition, a state machine may be nested within a composite parent state.  This
+allows common behaviors in the substate machine to be factored out into the parent
+state.
+
 For more information on UML state machines, see http://en.wikipedia.org/wiki/UML_state_machine.
 
 ## Usage
