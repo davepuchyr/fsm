@@ -2,8 +2,8 @@ fsm
 ===
 
 Provides a Finite State Machine utility for improved state management.  The state 
-machine model follows the definition from the Unified Modeling Language (UML).  
-The following elements are exposed in the API:
+machine model follows the definition from the Unified Modeling Language (UML).  The 
+following elements are exposed in the API:
 
 **Events** are external stimuli delvered to the state machine.  The event consists
 of a type and optional user-defined parameters that can be acted upon.  Each event
